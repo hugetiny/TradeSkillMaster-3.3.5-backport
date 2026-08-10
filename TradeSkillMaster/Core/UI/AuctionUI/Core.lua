@@ -74,14 +74,15 @@ function AuctionUI.RegisterTopLevelPage(name, callback, itemLinkedHandler)
 end
 
 function AuctionUI.SetOpenPage(name)
-	private.frame:SetSelectedNavButton(name, true)
+	private.frame:SetSelectedNavButton(L[name], true)
 end
 
 function AuctionUI.IsPageOpen(name)
 	if not private.frame then
 		return false
 	end
-	return private.frame:GetSelectedNavButton() == name
+	local navBtn = private.frame:GetSelectedNavButton()
+	return navBtn == L[name] or navBtn == name
 end
 
 function AuctionUI.IsScanning()
@@ -212,7 +213,7 @@ function private.CreateMainFrame()
 		:AddSwitchButton(private.SwitchBtnOnClick)
 		:SetScript("OnHide", private.BaseFrameOnHide)
 	for _, info in ipairs(private.topLevelPages) do
-		frame:AddNavButton(info.name, info.callback)
+		frame:AddNavButton(L[info.name], info.callback)
 	end
 	local whatsNewDialog = TSM.UI.WhatsNew.GetDialog()
 	if whatsNewDialog then
@@ -292,7 +293,7 @@ function private.ItemLinkedCallback(name, itemLink)
 	local path = private.frame:GetSelectedNavButton()
 	for _, info in ipairs(private.topLevelPages) do
 		if info.name == path then
-			if info.itemLinkedHandler(name, itemLink) then
+			if info.itemLinkedHandler and info.itemLinkedHandler(name, itemLink) then
 				return true
 			else
 				return
