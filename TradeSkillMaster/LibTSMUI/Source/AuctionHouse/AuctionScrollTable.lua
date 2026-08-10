@@ -1112,8 +1112,7 @@ function AuctionScrollTable.__private:_SetExpanded(dataIndex, expand)
 			self:_InsertSubRows(dataIndex + 1, private.subRowsTemp, false)
 		end
 		wipe(private.subRowsTemp)
-		-- Re-evaluate and redraw the expanded row
-		self:_SetDataForRow(dataIndex, data, true)
+		-- Redraw the expanded row
 		self:_DrawRowsForUpdatedData(dataIndex, dataIndex)
 	else
 		self._expanded[baseItemString] = nil
@@ -1143,9 +1142,7 @@ function AuctionScrollTable.__private:_SetExpanded(dataIndex, expand)
 			-- Remove now-hidden rows
 			self:_RemoveSubRows(firstSubRowIndex + 1, lastSubRowIndex)
 		end
-		-- Re-evaluate and redraw the first sub row
-		local firstRow = self._rawData[firstSubRowIndex]
-		self:_SetDataForRow(firstSubRowIndex, firstRow, true)
+		-- Redraw the first sub row
 		self:_DrawRowsForUpdatedData(firstSubRowIndex, firstSubRowIndex)
 	end
 end

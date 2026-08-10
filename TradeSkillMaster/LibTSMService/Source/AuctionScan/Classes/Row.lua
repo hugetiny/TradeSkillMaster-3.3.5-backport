@@ -319,8 +319,7 @@ end
 ---@param browseId number The ID of the browse query
 ---@param index? number The item index
 ---@param itemLink? string The item link
----@param page? number The auction house page number
-function AuctionRow:PopulateSubRows(browseId, index, itemLink, page)
+function AuctionRow:PopulateSubRows(browseId, index, itemLink)
 	if ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
 		assert(self._searchIndex and not index)
 		local subRowOffset = self._searchIndex * SUB_ROW_SEARCH_INDEX_MULTIPLIER
@@ -350,7 +349,7 @@ function AuctionRow:PopulateSubRows(browseId, index, itemLink, page)
 		-- Remove any prior results with a different browseId
 		assert(index and not self._searchIndex)
 		local subRow = AuctionSubRow.Get(self)
-		subRow:_SetRawData(index, browseId, itemLink, page)
+		subRow:_SetRawData(index, browseId, itemLink)
 		local _, hashNoSeller = subRow:GetHashes()
 		if self._minBrowseId and self._minBrowseId ~= browseId then
 			-- Check if this subRow already exists with a prior browseId
@@ -573,16 +572,7 @@ end
 ---@return number? minPrice
 function AuctionRow:GetBuyouts(resultItemKey)
 	if not ClientInfo.HasFeature(ClientInfo.FEATURES.C_AUCTION_HOUSE) then
-		local minItemBuyout = nil
-		for _, subRow in ipairs(self._subRows) do
-			if subRow:HasRawData() then
-				local _, itemBuyout = subRow:GetBuyouts()
-				if itemBuyout and itemBuyout > 0 then
-					minItemBuyout = min(minItemBuyout or math.huge, itemBuyout)
-				end
-			end
-		end
-		return nil, nil, minItemBuyout
+		return nil, nil, nil
 	end
 	assert(#self._items > 0)
 	if resultItemKey then

@@ -708,17 +708,12 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 			return self._findResult
 		end
 
-		-- per-item query, jumping straight to initial targetPage (Auctionator-style direct jump)
-		local initialTargetPage = (row.GetPage and row:GetPage()) or 0
-		local visitedPages = {}
-		local page = initialTargetPage
-		local maxPage = nil
-		local fallbackCandidate = 0
+		-- per-item query, page=0..maxPage
+		local page, maxPage = 0, nil
 		-- 3.3.5 FAST_FIND_POC fix: tracks whether the current page's data fully settled;
 		-- when it didn't (timeout), we must not trust the early-stop heuristic below.
 		local fastPageSettled = true
 		while true do
-			visitedPages[page] = true
 			if self._findQuery then
 				self._findQuery:Release()
 				self._findQuery = nil
@@ -799,12 +794,6 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 				-- again (throttle cleared / list settled) before returning the index,
 				-- exactly like the Browse tab and default UI where the list has long
 				-- settled before the user clicks Buyout.
-				-- 3.3.5 sniper buyout fix (part 2+3): wait for CanSendQuery() (client
-				-- throttle, ~1-1.5s) then wait only the REMAINING gap to cover Warmane's
-				-- server-side PlaceAuctionBid throttle (~2s after any query). The old
-				-- code always added Sleep(2) ON TOP of the CanSendQuery wait → 3.5s total.
-				-- Now we account for time already spent waiting, capping at BID_THROTTLE.
-				local BID_THROTTLE = 2
 				local settleStart = GetTime and GetTime() or 0
 				while not AuctionHouse.CanSendQuery() do
 					Threading.Yield(true)
@@ -815,34 +804,38 @@ function AuctionScanManager.__private:_FindAuctionThreadedClassic(row, noSeller,
 						break
 					end
 				end
-				-- CanSendQuery() already burned part of the bid-throttle window.
-				-- Only sleep whatever is left (often 0.5s or less, not a full 2s).
-				local remaining = BID_THROTTLE - AuctionHouse.GetTimeSinceLastQuery()
-				if remaining > 0 then
-					Threading.Sleep(remaining)
-				end
+				-- 3.3.5 sniper buyout fix (part 3): Warmane throttles PlaceAuctionBid for
+				-- a couple seconds after ANY auction query from the player. CanSendQuery()
+				-- (the client query throttle) clears FASTER than this server-side bid
+				-- throttle, which is why canSendQuery=true above yet the bid is still
+				-- silently dropped (no event, no gold change, 5s client timeout). The
+				-- sniper is always querying (or just requeried right here), so the bid
+				-- always lands inside that window. Browse / default UI work only because
+				-- of the human gap (select -> click Buy -> confirm) with no query in
+				-- between. The scan is paused during this find (no queries fire while we
+				-- sleep), so wait out the server bid-throttle before returning the index.
+				Threading.Sleep(2)
 				return self._findResult
 			elseif self._cancelled then
 				return nil
 			end
 
-			local numPages = AuctionHouse.GetNumPages() or 1
-			maxPage = maxPage or math.max(0, numPages - 1)
-
 			-- If the current page's last auction indicates the item cannot be on a later page,
-			-- stop early instead of scanning all pages. Only valid when scanning sequentially from page 0 upwards.
-			if page == fallbackCandidate and fastPageSettled and not self:_FindAuctionCanBeOnLaterPage(row) then
+			-- stop early instead of scanning all pages.
+			-- 3.3.5 FAST_FIND_POC fix: only trust the early-stop heuristic when the page
+			-- data fully settled; with partial data the last row's buyout/stackSize can be
+			-- nil/garbage and the heuristic wrongly aborts the find on page 0, producing
+			-- the false "Failed to find auction" result for lots on later pages.
+			if fastPageSettled and not self:_FindAuctionCanBeOnLaterPage(row) then
 				break
 			end
-
-			-- Advance to next unvisited fallback page from 0 upwards
-			while visitedPages[fallbackCandidate] and fallbackCandidate <= maxPage do
-				fallbackCandidate = fallbackCandidate + 1
-			end
-			if fallbackCandidate > maxPage then
+			local numPages = AuctionHouse.GetNumPages()
+			maxPage = maxPage or (numPages - 1)
+			if page < maxPage then
+				page = page + 1
+			else
 				break
 			end
-			page = fallbackCandidate
 		end
 		-- pass 1 ничего не дал — если был с seller-strict и owner не "?", дел��ем pass 2
 		-- Если passFlag (noSeller) уже true — выходим, ничего не нашли

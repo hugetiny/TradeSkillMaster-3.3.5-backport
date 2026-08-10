@@ -558,7 +558,5 @@ function Thread.__private:_OnFutureDone()
 	end
 	-- Run the thread to allow the future result to be captured synchronously
 	self:UpdateState()
-	if private.runningThread == nil then
-		self:Run(0)
-	end
+	self:Run(0)
 end
